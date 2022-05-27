@@ -1,5 +1,6 @@
 const express = require('express');
-const { shuffle } = require('lodash');
+const { shuffle, unzip } = require('lodash');
+
 
 const app = express();
 
@@ -124,7 +125,7 @@ class Tambola {
     }
     const isValid = this.validateTicket(ticket);
     if (isValid) {
-      return ticket;
+      return this.sortedNumbers(ticket);
     } else {
       // Remove those numbers from pickedNumbers list & redo the process.
       const ticketNumbers = ticket.flat();
@@ -135,6 +136,40 @@ class Tambola {
       ticket = this.genRandomizedTicket();
       return ticket;
     }
+  };
+
+  sortedNumbers(finalTicket) {
+    // For each column in the ticket
+    // Find out if there are cases when things need to be swapped.
+    // If they do, swap them to fix order and then send.
+    const ticket = unzip(finalTicket);
+    ticket.map(column => {
+      // Full column? Sort and return
+      const flattenedColumn = column.filter(Boolean);
+      if (flattenedColumn.length === 3) {
+        console.log('Ticket to sort', ticket);
+        console.log('Sorted column', column.sort());
+
+        return column.sort();
+      }
+      // There are 3 cases for this. 1-2, 2-3, 1-3
+      if (flattenedColumn.length === 2) {
+        // Find which cell is 0;
+        const zeroIndex = column.findIndex(cell => cell === 0);
+        const otherIndices = [0, 1, 2];
+        otherIndices.splice(zeroIndex, 1);
+        const o1 = otherIndices[0];
+        const o2 = otherIndices[1];
+        if (column[o1] > column[o2]) {
+          let temp = column[o1];
+          column[o1] = column[o2];
+          column[o2] = temp;
+        }
+      }
+      return column;
+    });
+    console.log('Sorted ticket', ticket);
+    return unzip(ticket);
   };
 
   //
@@ -233,14 +268,14 @@ class Tambola {
         }
       }
     });
-    return ticket;
+    return this.sortedNumbers(ticket);
   };
 }
 
 app.get('/get_tickets', (req, res) => {
   const tambola = new Tambola();
   res.json({
-    data: tambola.tickets(),
+    data: tambola.getTickets(),
   });
 });
 
